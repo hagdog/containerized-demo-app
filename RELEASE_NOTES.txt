@@ -1,0 +1,27 @@
+Release Notes for the Mocksystemundertest Container
+
+
+Release: 0.9
+
+# The mocksystemundertest Container
+The hosted application was renamed from mockssystemundertest to demoapp.
+Correspondingly, the entry point was changed from mocksystemundertest.engine
+to demoapp.demoapp.
+
+# Python Modules
+The mocksystemundertest application was replaced with the demoapp application.
+The change was primarily made to clarify the distinction between container
+management and operation of the the hosted application.
+
+Mocksystemunder test refers to the SUT container. demoapp is a demonstration
+application. The SidecarMediator API can manage the SUT container itself.
+The SidecarMediator API listend for messages from and can send signals to
+the hosted application.
+
+Reference: https://stash.rspringob.local/projects/CICD/repos/mobius-testassitant/pull-requests/38
+
+## Previous Releases
+
+Release: < 0.9
+Changes were frequent and version tracking was not important prior to release 0.9.
+Prior changes were not recorded.

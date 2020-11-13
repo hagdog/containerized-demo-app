@@ -1,0 +1,15 @@
+FROM artifactory.rspringob.local/python:3.7.5
+
+LABEL maintainer = "Team Mobius <team_mobius@matrix.com>"
+LABEL description = "System Under Test (SUT) container"
+
+# This is deliberate, copy the apt proxy file BEFORE creating the test layer.
+COPY fixProxy.sh /
+RUN /fixProxy.sh
+
+# /python-staging is in context
+COPY context /
+RUN pip3 install /python-staging/*.whl
+
+# Set up the entrypoint
+ENTRYPOINT ["python", "-m", "demoapp.demoapp"]

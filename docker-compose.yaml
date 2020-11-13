@@ -1,0 +1,18 @@
+version: "3"
+services:
+  system-under-test:
+    image: ${SERVICE_IMAGE:-mobius-mocksystemundertest:latest}
+    command: --socket-file "/tmp/testassitant/system_under_test_socket"
+    privileged: true
+    ports:
+      - target: 8000
+      - published:${REST_PORT:-8000}"
+      - protocol: tcp
+      - mode: host
+    volumes:
+      - /usr/bin/docker:/usr/bin/docker
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${TEST_RESULT_DIR:-/tmp/testresults}:${TEST_RESULT_DIR:-/tmp/testresults}
+
+    environment:
+      - PYTHON_LOG_LEVEL=${PYTHON_LOG_LEVEL:-WARNING}

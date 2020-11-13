@@ -1,0 +1,2 @@
+demoapp==0.9
+sidecarmediator==0.9

@@ -1,0 +1,132 @@
+description = 'Build the mocksystemundertest Docker image for mobius TestAssitant.'
+// This build produces a Python module and a Docker container which itself
+// imports the locally-built and external Python modules.
+
+import com.bmuschko.gradle.docker.tasks.image.Dockerfile
+
+ext {
+    containerName = 'mobius-mocksystemundertest'
+    containerRootDirectory = "${buildDir}/${containerName}"
+    imageID = getImageID(containerName)
+    projectSitePkgs = "${projectDir}/" + getVirtPkgsDir()
+}
+
+// The src files directory path for python builds
+svtPython {
+    srcFilesPath = 'demoapp'
+    testFilesPath = ''
+}
+
+task installRequiredApps(type: Exec) {
+    description = 'Installs locally built packages required by a project.'
+
+    dependsOn ':sidecarmediator:buildPythonPackage'
+    inputs.file "${localPackages}/sidecarmediator-${majorMinorVersion}-py3-none-any.whl"
+    outputs.dir "${projectSitePkgs}/sidecarmediator"
+    outputs.dir "${projectSitePkgs}/sidecarmediator-${majorMinorVersion}.dist-info"
+
+    commandLine  \
+        './venv/bin/pip3',
+        'install',
+        "${localPackages}/sidecarmediator-${majorMinorVersion}-py3-none-any.whl"
+}
+
+
+// -- Docker Declarations
+
+// The structure of the staging directory:
+//
+// ${containerRootDirectory}
+//   Put the dockerfile and one-time scripts here
+// ${containerRootDirectory}/context
+//   Put the image content here. This directory will be laid down over '/'.
+//   For example:
+//     In the local build tree. ->  ${containerRootDirectory}/context/var/log/foo.log
+//     In the Docker container. ->  /var/log/foo.log
+task stageDockerBuild(type: Copy) {
+    description = 'Copy artifacts to a directory to stage a Docker image build.'
+
+    dependsOn 'buildPythonPackage', ':sidecarmediator:buildPythonPackage'
+    inputs.files (
+        'fixProxy.sh',
+    )
+    outputs.dir 'context/python-staging'
+
+    includeEmptyDirs = false
+
+    into("${containerRootDirectory}")
+
+    into ('context/python-staging') {
+        from (localPackages) {
+            include "demoapp-${majorMinorVersion}-py3-none-any.whl"
+            include "sidecarmediator-${majorMinorVersion}-py3-none-any.whl"
+        }
+    }
+
+    into (".") {
+        from ('.') {
+            include 'fixProxy.sh'
+        }
+    }
+}
+
+task createDockerfile(type: Dockerfile) {
+    description 'Create a Dockerfile from a template.'
+
+    inputs.file  'Dockerfile.template'
+    outputs.file "$containerRootDirectory/Dockerfile"
+
+    // Stage the Dockerfile to the build directory.
+    destFile = file("$containerRootDirectory/Dockerfile")
+    instructionsFromTemplate file('Dockerfile.template')
+    label version: "${project.version}"
+    label service: "${project.containerName}"
+}
+
+svtDocker {
+    serviceName = containerName
+}
+
+buildImage.dependsOn createDockerfile, stageDockerBuild
+
+installDevTestTools.dependsOn installRequiredApps
+
+// -- Housekeeping
+
+task cleanDocker (type: Delete) {
+    description = 'Removes the Docker build directory and image.'
+
+    delete containerRootDirectory
+
+    doLast {
+        if ( imageID != "unknown" ) {
+            exec {
+                def stderr = new ByteArrayOutputStream()
+                errorOutput = stderr
+                ignoreExitValue true
+                commandLine 'docker', 'rmi', '-f',  imageID
+            }
+        }
+    }
+}
+
+task pruneDockerImages (type: Exec) {
+    description = 'Removes all untagged Docker images.'
+
+    // Docker only allows one prune operation at a time.
+    // Ignore failures from concurrent prune operations.
+    ignoreExitValue true
+    commandLine 'docker', 'image', 'prune', '-f'
+}
+
+clean.dependsOn cleanDocker
+
+task distClean (type: Delete) {
+    description = 'Removes all virtual environments, build directories, removes and prunes cached Docker images.'
+    group = 'Build'
+
+    dependsOn 'clean', 'pruneDockerImages'
+
+    delete project.buildDir
+    delete rootProject.buildDir
+}
